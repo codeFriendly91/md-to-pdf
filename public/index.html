@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>md2pdf — Markdown a PDF bonito</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel2: #1c2230; --border: #30363d;
+    --fg: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --accent2: #1f6feb;
+    --ok: #3fb950; --err: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--fg);
+    font-family: "Segoe UI", -apple-system, system-ui, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  header {
+    padding: 18px 26px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 700; }
+  header .badge { font-size: 12px; color: var(--muted); }
+  .logo {
+    width: 34px; height: 34px; border-radius: 8px; flex: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: grid; place-items: center; font-weight: 800; color: #fff; font-size: 13px;
+  }
+  main { flex: 1; display: grid; grid-template-columns: 380px 1fr; gap: 0; min-height: 0; }
+  .controls { padding: 22px; border-right: 1px solid var(--border); overflow-y: auto; }
+  .preview { background: #525659; display: flex; flex-direction: column; min-width: 0; }
+  .preview .ph {
+    flex: 1; display: grid; place-items: center; color: #cfd3d8; text-align: center; padding: 30px;
+  }
+  iframe { flex: 1; border: 0; width: 100%; background: #525659; }
+
+  /* tabs */
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; background: var(--panel); padding: 4px; border-radius: 9px; border: 1px solid var(--border); }
+  .tab { flex: 1; text-align: center; padding: 8px 10px; border-radius: 6px; font-size: 13px; font-weight: 600;
+    color: var(--muted); cursor: pointer; transition: .12s; user-select: none; }
+  .tab:hover { color: var(--fg); }
+  .tab.active { background: var(--accent2); color: #fff; }
+  .pane { display: none; }
+  .pane.active { display: block; }
+
+  textarea {
+    width: 100%; min-height: 320px; resize: vertical; background: var(--panel); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+    font-family: "Cascadia Code", "Consolas", monospace; font-size: 12.5px; line-height: 1.5;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  .field-label { font-size: 12px; color: var(--muted); margin: 12px 0 6px; }
+  input[type="text"] { width: 100%; background: var(--panel); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 7px; padding: 8px 10px; font-size: 13px; }
+  input[type="text"]:focus { outline: none; border-color: var(--accent); }
+
+  .drop {
+    border: 2px dashed var(--border); border-radius: 12px; padding: 26px 18px; text-align: center;
+    cursor: pointer; transition: .15s; background: var(--panel);
+  }
+  .drop:hover, .drop.over { border-color: var(--accent); background: var(--panel2); }
+  .drop .big { font-size: 28px; margin-bottom: 6px; }
+  .drop .hint { color: var(--muted); font-size: 13px; }
+  .drop strong { color: var(--accent); }
+
+  .file { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel); font-size: 13px; display: none; align-items: center; gap: 8px; }
+  .file.show { display: flex; }
+  .file .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file .size { color: var(--muted); margin-left: auto; flex: none; }
+
+  .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted);
+    margin: 22px 0 10px; font-weight: 700; }
+
+  .opt { display: flex; align-items: center; gap: 10px; padding: 9px 0; }
+  .opt label { font-size: 14px; }
+  .opt .desc { color: var(--muted); font-size: 12px; }
+
+  select {
+    background: var(--panel); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 7px; padding: 7px 10px; font-size: 13px; width: 100%;
+  }
+
+  /* toggle */
+  .switch { position: relative; width: 40px; height: 22px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: var(--border); border-radius: 22px; transition: .15s; cursor: pointer; }
+  .slider::before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: .15s; }
+  .switch input:checked + .slider { background: var(--accent2); }
+  .switch input:checked + .slider::before { transform: translateX(18px); }
+  .opt .text { display: flex; flex-direction: column; }
+
+  .actions { margin-top: 24px; display: flex; flex-direction: column; gap: 10px; }
+  button {
+    border: 0; border-radius: 8px; padding: 12px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: .15s;
+  }
+  .btn-primary { background: var(--accent2); color: #fff; }
+  .btn-primary:hover { background: #388bfd; }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--accent); }
+  .btn-ghost:disabled { opacity: .4; cursor: not-allowed; }
+
+  .status { margin-top: 14px; font-size: 13px; min-height: 18px; }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--err); }
+  .status.busy { color: var(--accent); }
+  .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">MD</div>
+    <h1>md2pdf</h1>
+    <span class="badge">Markdown → PDF, sin cortar tablas</span>
+  </header>
+
+  <main>
+    <div class="controls">
+      <div class="tabs">
+        <div class="tab active" data-tab="file">📄 Archivo</div>
+        <div class="tab" data-tab="paste">📝 Pegar texto</div>
+      </div>
+
+      <div id="pane-file" class="pane active">
+        <div id="drop" class="drop">
+          <div class="big">📄⬇️</div>
+          <div>Arrastrá un <strong>.md</strong> acá<br />o hacé clic para elegirlo</div>
+          <div class="hint">También podés soltar texto Markdown</div>
+          <input id="fileInput" type="file" accept=".md,.markdown,.txt,text/markdown" hidden />
+        </div>
+        <div id="fileBox" class="file">
+          <span>📝</span>
+          <span class="name" id="fileName">—</span>
+          <span class="size" id="fileSize"></span>
+        </div>
+      </div>
+
+      <div id="pane-paste" class="pane">
+        <textarea id="pasteArea" placeholder="# Pegá tu Markdown acá&#10;&#10;Por ejemplo:&#10;&#10;| Columna | Valor |&#10;| --- | --- |&#10;| A | 1 |"></textarea>
+        <div class="field-label">Nombre del archivo (opcional)</div>
+        <input type="text" id="pasteName" placeholder="documento" />
+      </div>
+
+      <div class="section-title">Opciones</div>
+
+      <div class="opt">
+        <div class="text">
+          <label for="theme">Tema</label>
+          <span class="desc">Colores del documento</span>
+        </div>
+        <select id="theme" style="width:140px; margin-left:auto;">
+          <option value="light">Claro</option>
+          <option value="dark">Oscuro</option>
+        </select>
+      </div>
+
+      <div class="opt">
+        <div class="text">
+          <label>Índice (TOC)</label>
+          <span class="desc">Tabla de contenidos automática</span>
+        </div>
+        <label class="switch" style="margin-left:auto;">
+          <input type="checkbox" id="toc" checked />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="opt">
+        <div class="text">
+          <label>Horizontal</label>
+          <span class="desc">Mejor para tablas muy anchas</span>
+        </div>
+        <label class="switch" style="margin-left:auto;">
+          <input type="checkbox" id="landscape" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="generate" class="btn-primary" disabled>Generar PDF</button>
+        <button id="download" class="btn-ghost" disabled>Descargar PDF</button>
+      </div>
+
+      <div id="status" class="status"></div>
+    </div>
+
+    <div class="preview">
+      <div id="placeholder" class="ph">
+        <div>
+          <div style="font-size:40px; margin-bottom:10px;">👀</div>
+          La vista previa del PDF aparece acá.<br />
+          Elegí un archivo y generá.
+        </div>
+      </div>
+      <iframe id="frame" style="display:none;" title="Vista previa PDF"></iframe>
+    </div>
+  </main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const drop = $("drop"), fileInput = $("fileInput");
+  let mode = "file";          // "file" | "paste"
+  let fileMarkdown = "", fileName = "documento.md", pdfUrl = null;
+
+  function setStatus(msg, cls = "") { const s = $("status"); s.className = "status " + cls; s.innerHTML = msg; }
+  function human(n) { return n < 1024 ? n + " B" : (n / 1024).toFixed(1) + " KB"; }
+
+  // Fuente actual segun la pestaña activa
+  function currentSource() {
+    if (mode === "paste") {
+      const text = $("pasteArea").value;
+      const name = ($("pasteName").value.trim() || "documento").replace(/\.md$/i, "") + ".md";
+      return { markdown: text, filename: name };
+    }
+    return { markdown: fileMarkdown, filename: fileName };
+  }
+
+  function refreshGenerate() {
+    $("generate").disabled = !currentSource().markdown.trim();
+  }
+
+  // Pestañas
+  document.querySelectorAll(".tab").forEach((t) => {
+    t.addEventListener("click", () => {
+      mode = t.dataset.tab;
+      document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x === t));
+      $("pane-file").classList.toggle("active", mode === "file");
+      $("pane-paste").classList.toggle("active", mode === "paste");
+      refreshGenerate();
+    });
+  });
+
+  $("pasteArea").addEventListener("input", refreshGenerate);
+  $("pasteName").addEventListener("input", refreshGenerate);
+
+  function loadText(text, name) {
+    fileMarkdown = text;
+    fileName = name || "documento.md";
+    $("fileName").textContent = fileName;
+    $("fileSize").textContent = human(new Blob([text]).size);
+    $("fileBox").classList.add("show");
+    setStatus("Listo para generar.", "");
+    refreshGenerate();
+  }
+
+  function handleFile(file) {
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = () => loadText(r.result, file.name);
+    r.readAsText(file);
+  }
+
+  drop.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", (e) => handleFile(e.target.files[0]));
+
+  ["dragenter", "dragover"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); })
+  );
+  ["dragleave", "drop"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); })
+  );
+  drop.addEventListener("drop", (e) => {
+    const file = e.dataTransfer.files[0];
+    if (file) return handleFile(file);
+    const text = e.dataTransfer.getData("text");
+    if (text) loadText(text, "pegado.md");
+  });
+
+  $("generate").addEventListener("click", async () => {
+    const { markdown, filename } = currentSource();
+    if (!markdown.trim()) return;
+    $("generate").disabled = true;
+    $("download").disabled = true;
+    setStatus('<span class="spinner"></span>Generando PDF…', "busy");
+
+    try {
+      const res = await fetch("/convert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          markdown, filename,
+          theme: $("theme").value,
+          toc: $("toc").checked,
+          landscape: $("landscape").checked,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Error " + res.status }));
+        throw new Error(err.error || "Error " + res.status);
+      }
+      const blob = await res.blob();
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+      pdfUrl = URL.createObjectURL(blob);
+      $("placeholder").style.display = "none";
+      const frame = $("frame");
+      frame.style.display = "block";
+      frame.src = pdfUrl;
+      $("download").disabled = false;
+      setStatus("✓ PDF generado (" + (blob.size / 1024).toFixed(0) + " KB).", "ok");
+    } catch (e) {
+      setStatus("✗ " + e.message, "err");
+    } finally {
+      $("generate").disabled = false;
+    }
+  });
+
+  $("download").addEventListener("click", () => {
+    if (!pdfUrl) return;
+    const a = document.createElement("a");
+    a.href = pdfUrl;
+    a.download = currentSource().filename.replace(/\.md$/i, "") + ".pdf";
+    a.click();
+  });
+</script>
+</body>
+</html>

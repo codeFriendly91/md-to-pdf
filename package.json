@@ -1,0 +1,21 @@
+{
+  "name": "md-to-pdf-pretty",
+  "version": "1.0.0",
+  "description": "Convierte Markdown a PDF bonito usando el motor de Chrome/Edge, sin cortar tablas.",
+  "type": "module",
+  "bin": {
+    "md2pdf": "convert.js"
+  },
+  "scripts": {
+    "convert": "node convert.js",
+    "ui": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "highlight.js": "^11.10.0",
+    "markdown-it": "^14.1.0",
+    "markdown-it-anchor": "^9.2.0",
+    "mermaid": "^11.16.0",
+    "puppeteer-core": "^25.2.1"
+  }
+}
